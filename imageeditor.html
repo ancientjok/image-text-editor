@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>edging corp</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            gap: 20px;
+        }
+        .editor {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .controls {
+            width: 300px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            max-width: 100%;
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            width: 100%;
+            margin: 5px 0;
+            padding: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+        }
+        .slider-container input[type="range"] {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .slider-container span {
+            min-width: 30px;
+        }
+        .draggable-text {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image editor</h1>
+    <div class="container">
+        <div class="editor">
+            <input type="file" id="imageInput" accept="image/*">
+            <canvas id="canvas"></canvas>
+            <button id="exportBtn">Export Image</button>
+        </div>
+        <div class="controls">
+            <h2>Text Controls</h2>
+            <div class="control-group">
+                <input type="text" id="textInput" placeholder="Enter text">
+            </div>
+            <div class="control-group slider-container">
+                <input type="range" id="xSlider" min="0" max="100" value="50">
+                <span id="xValue">X: 50%</span>
+            </div>
+            <div class="control-group slider-container">
+                <input type="range" id="ySlider" min="0" max="100" value="50">
+                <span id="yValue">Y: 50%</span>
+            </div>
+            <div class="control-group slider-container">
+                <input type="range" id="sizeSlider" min="10" max="100" value="30">
+                <span id="sizeValue">Size: 30px</span>
+            </div>
+            <div class="control-group">
+                <select id="fontSelect">
+                    <option value="Arial">Arial</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier">Courier</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans-serif">Sans-serif</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <input type="color" id="colorPicker" value="#000000">
+                <select id="alignSelect">
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                </select>
+            </div>
+            <div class="control-group slider-container">
+                <input type="range" id="rotationSlider" min="0" max="360" value="0">
+                <span id="rotationValue">Rotation: 0°</span>
+            </div>
+            <button id="addTextBtn">Add Text</button>
+            <button id="undoBtn">Undo Last Text</button>
+            <button id="clearBtn">Clear All Text</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const imageInput = document.getElementById('imageInput');
+        const textInput = document.getElementById('textInput');
+        const xSlider = document.getElementById('xSlider');
+        const ySlider = document.getElementById('ySlider');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const fontSelect = document.getElementById('fontSelect');
+        const colorPicker = document.getElementById('colorPicker');
+        const alignSelect = document.getElementById('alignSelect');
+        const rotationSlider = document.getElementById('rotationSlider');
+        const addTextBtn = document.getElementById('addTextBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const exportBtn = document.getElementById('exportBtn');
+
+        let img = new Image();
+        let textElements = [];
+        let isDragging = false;
+        let dragTarget = null;
+        let lastX, lastY;
+
+        imageInput.addEventListener('change', loadImage);
+        addTextBtn.addEventListener('click', addText);
+        undoBtn.addEventListener('click', undoLastText);
+        clearBtn.addEventListener('click', clearAllText);
+        exportBtn.addEventListener('click', exportImage);
+        xSlider.addEventListener('input', updateSliderValue);
+        ySlider.addEventListener('input', updateSliderValue);
+        sizeSlider.addEventListener('input', updateSliderValue);
+        rotationSlider.addEventListener('input', updateSliderValue);
+
+        canvas.addEventListener('mousedown', startDragging);
+        canvas.addEventListener('mousemove', drag);
+        canvas.addEventListener('mouseup', stopDragging);
+        canvas.addEventListener('mouseleave', stopDragging);
+
+        function loadImage(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    redrawCanvas();
+                };
+                img.src = event.target.result;
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function addText() {
+            const text = textInput.value;
+            const x = canvas.width * (xSlider.value / 100);
+            const y = canvas.height * (ySlider.value / 100);
+            const size = sizeSlider.value;
+            const font = fontSelect.value;
+            const color = colorPicker.value;
+            const align = alignSelect.value;
+            const rotation = parseInt(rotationSlider.value);
+
+            textElements.push({text, x, y, size, font, color, align, rotation});
+            redrawCanvas();
+        }
+
+        function undoLastText() {
+            if (textElements.length > 0) {
+                textElements.pop();
+                redrawCanvas();
+            }
+        }
+
+        function clearAllText() {
+            textElements = [];
+            redrawCanvas();
+        }
+
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            textElements.forEach(renderText);
+        }
+
+        function renderText(item) {
+            ctx.save();
+            ctx.translate(item.x, item.y);
+            ctx.rotate(item.rotation * Math.PI / 180);
+            ctx.font = `${item.size}px ${item.font}`;
+            ctx.fillStyle = item.color;
+            ctx.textAlign = item.align;
+            ctx.fillText(item.text, 0, 0);
+            ctx.restore();
+        }
+
+        function exportImage() {
+            canvas.toBlob((blob) => {
+                saveAs(blob, "edited_image.png");
+            });
+        }
+
+        function updateSliderValue(e) {
+            const value = e.target.value;
+            switch(e.target.id) {
+                case 'xSlider':
+                    document.getElementById('xValue').textContent = `X: ${value}%`;
+                    break;
+                case 'ySlider':
+                    document.getElementById('yValue').textContent = `Y: ${value}%`;
+                    break;
+                case 'sizeSlider':
+                    document.getElementById('sizeValue').textContent = `Size: ${value}px`;
+                    break;
+                case 'rotationSlider':
+                    document.getElementById('rotationValue').textContent = `Rotation: ${value}°`;
+                    break;
+            }
+        }
+
+        function startDragging(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            for (let i = textElements.length - 1; i >= 0; i--) {
+                const item = textElements[i];
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.rotate(item.rotation * Math.PI / 180);
+                const metrics = ctx.measureText(item.text);
+                const width = metrics.width;
+                const height = parseInt(item.size);
+                ctx.restore();
+
+                if (x >= item.x - width/2 && x <= item.x + width/2 &&
+                    y >= item.y - height/2 && y <= item.y + height/2) {
+                    isDragging = true;
+                    dragTarget = item;
+                    lastX = x;
+                    lastY = y;
+                    break;
+                }
+            }
+        }
+
+        function drag(e) {
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const dx = x - lastX;
+                const dy = y - lastY;
+                
+                dragTarget.x += dx;
+                dragTarget.y += dy;
+                
+                lastX = x;
+                lastY = y;
+                
+                redrawCanvas();
+            }
+        }
+
+        function stopDragging() {
+            isDragging = false;
+            dragTarget = null;
+        }
+    </script>
+</body>
+</html>
