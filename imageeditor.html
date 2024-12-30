@@ -14,12 +14,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            background-color: #1a1a1a;
+            color: #ffffff;
         }
+        
         .container {
             display: flex;
             width: 100%;
             gap: 20px;
         }
+        
         .editor {
             flex: 1;
             display: flex;
@@ -27,22 +31,51 @@
             align-items: center;
             position: relative;
         }
+        
         .controls {
             width: 300px;
             padding: 20px;
-            background-color: #f0f0f0;
+            background-color: #2d2d2d;
             border-radius: 10px;
+            color: #ffffff;
         }
+        
         canvas {
-            border: 1px solid #ccc;
+            border: 1px solid #444;
             max-width: 100%;
             margin-bottom: 20px;
+            background-color: #333;
         }
+        
         input, select, button {
             width: 100%;
             margin: 5px 0;
             padding: 5px;
+            background-color: #3d3d3d;
+            color: #ffffff;
+            border: 1px solid #555;
         }
+        
+        select option {
+            background-color: #3d3d3d;
+            color: #ffffff;
+        }
+        
+        input[type="file"] {
+            background-color: transparent;
+            border: none;
+            color: #ffffff;
+        }
+        
+        input[type="range"] {
+            background-color: #3d3d3d;
+        }
+        
+        input[type="color"] {
+            background-color: #3d3d3d;
+            border: 1px solid #555;
+        }
+        
         button {
             background-color: #4CAF50;
             color: white;
@@ -51,6 +84,7 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
+        
         button:hover {
             background-color: #45a049;
         }
@@ -153,14 +187,13 @@
         let isDragging = false;
         let dragTarget = null;
         let lastX, lastY;
+        let selectedText = null;
 
         imageInput.addEventListener('change', loadImage);
         addTextBtn.addEventListener('click', addText);
         undoBtn.addEventListener('click', undoLastText);
         clearBtn.addEventListener('click', clearAllText);
         exportBtn.addEventListener('click', exportImage);
-        xSlider.addEventListener('input', updateSliderValue);
-        ySlider.addEventListener('input', updateSliderValue);
         sizeSlider.addEventListener('input', updateSliderValue);
         rotationSlider.addEventListener('input', updateSliderValue);
 
@@ -168,6 +201,93 @@
         canvas.addEventListener('mousemove', drag);
         canvas.addEventListener('mouseup', stopDragging);
         canvas.addEventListener('mouseleave', stopDragging);
+
+        canvas.addEventListener('click', selectText);
+        sizeSlider.addEventListener('input', updateSelectedText);
+        xSlider.addEventListener('input', updateSelectedText);
+        ySlider.addEventListener('input', updateSelectedText);
+
+        function selectText(e) {
+            if (isDragging) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            
+            selectedText = null;
+            
+            for (let i = textElements.length - 1; i >= 0; i--) {
+                const item = textElements[i];
+                ctx.font = `${item.size}px ${item.font}`;
+                const metrics = ctx.measureText(item.text);
+                const width = metrics.width;
+                const height = parseInt(item.size);
+        
+                if (x >= item.x - width/2 && x <= item.x + width/2 &&
+                    y >= item.y - height && y <= item.y + height/2) {
+                    selectedText = item;
+                    
+                    // Update sliders to match selected text
+                    xSlider.value = Math.round((item.x / canvas.width) * 100);
+                    ySlider.value = Math.round((item.y / canvas.height) * 100);
+                    sizeSlider.value = item.size;
+                    
+                    document.getElementById('xValue').textContent = `X: ${xSlider.value}%`;
+                    document.getElementById('yValue').textContent = `Y: ${ySlider.value}%`;
+                    document.getElementById('sizeValue').textContent = `Size: ${sizeSlider.value}px`;
+                    
+                    redrawCanvas();
+                    drawSelectionBox(item);
+                    break;
+                }
+            }
+            
+            if (!selectedText) {
+                redrawCanvas();
+            }
+        }
+        
+        function updateSelectedText(e) {
+            if (!selectedText) return;
+            
+            const value = e.target.value;
+            switch(e.target.id) {
+                case 'xSlider':
+                    selectedText.x = (value / 100) * canvas.width;
+                    document.getElementById('xValue').textContent = `X: ${value}%`;
+                    break;
+                case 'ySlider':
+                    selectedText.y = (value / 100) * canvas.height;
+                    document.getElementById('yValue').textContent = `Y: ${value}%`;
+                    break;
+                case 'sizeSlider':
+                    selectedText.size = parseInt(value);
+                    document.getElementById('sizeValue').textContent = `Size: ${value}px`;
+                    break;
+            }
+            
+            redrawCanvas();
+            drawSelectionBox(selectedText);
+        }
+        
+        function drawSelectionBox(item) {
+            ctx.save();
+            ctx.font = `${item.size}px ${item.font}`;
+            const metrics = ctx.measureText(item.text);
+            const width = metrics.width;
+            const height = parseInt(item.size);
+            
+            ctx.strokeStyle = '#00f';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(
+                item.x - width/2 - 5,
+                item.y - height - 5,
+                width + 10,
+                height + 10
+            );
+            ctx.restore();
+        }
 
         function loadImage(e) {
             const file = e.target.files[0];
@@ -254,52 +374,89 @@
 
         function startDragging(e) {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            
+            selectedText = null;
             
             for (let i = textElements.length - 1; i >= 0; i--) {
                 const item = textElements[i];
-                ctx.save();
-                ctx.translate(item.x, item.y);
-                ctx.rotate(item.rotation * Math.PI / 180);
+                ctx.font = `${item.size}px ${item.font}`;
                 const metrics = ctx.measureText(item.text);
                 const width = metrics.width;
                 const height = parseInt(item.size);
-                ctx.restore();
-
-                if (x >= item.x - width/2 && x <= item.x + width/2 &&
-                    y >= item.y - height/2 && y <= item.y + height/2) {
+        
+                const itemX = item.x;
+                const itemY = item.y;
+        
+                if (x >= itemX - width/2 && x <= itemX + width/2 &&
+                    y >= itemY - height && y <= itemY + height/2) {
                     isDragging = true;
                     dragTarget = item;
                     lastX = x;
                     lastY = y;
+                    dragTarget.offsetX = x - itemX;
+                    dragTarget.offsetY = y - itemY;
                     break;
                 }
             }
-        }
-
+        }        
+        
         function drag(e) {
-            if (isDragging) {
+            if (isDragging && dragTarget) {
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                const dx = x - lastX;
-                const dy = y - lastY;
+                const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
-                dragTarget.x += dx;
-                dragTarget.y += dy;
+                dragTarget.x = x - dragTarget.offsetX;
+                dragTarget.y = y - dragTarget.offsetY;
                 
-                lastX = x;
-                lastY = y;
+                const xPercent = Math.round((dragTarget.x / canvas.width) * 100);
+                const yPercent = Math.round((dragTarget.y / canvas.height) * 100);
+                
+                xSlider.value = xPercent;
+                ySlider.value = yPercent;
+                document.getElementById('xValue').textContent = `X: ${xPercent}%`;
+                document.getElementById('yValue').textContent = `Y: ${yPercent}%`;
                 
                 redrawCanvas();
+                if (selectedText === dragTarget) {
+                    drawSelectionBox(dragTarget);
+                }
+            }
+        }
+        
+        function stopDragging() {
+            isDragging = false;
+            if (dragTarget) {
+                dragTarget.offsetX = 0;
+                dragTarget.offsetY = 0;
+                dragTarget = null;
             }
         }
 
-        function stopDragging() {
-            isDragging = false;
-            dragTarget = null;
-        }
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            startDragging(mouseEvent);
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            drag(mouseEvent);
+        });
+        
+        canvas.addEventListener('touchend', stopDragging);
+        canvas.addEventListener('touchcancel', stopDragging);
     </script>
 </body>
 </html>
