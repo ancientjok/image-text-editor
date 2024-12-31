@@ -1,2 +1,2 @@
 # image-text-editor
-![image](https://github.com/user-attachments/assets/804846df-e4eb-4bfd-829c-71e86b65f7c3)
+![image](https://github.com/user-attachments/assets/a4393438-2d32-4d0c-ac56-eeaac57103e4)
