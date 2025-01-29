@@ -27,9 +27,11 @@
         .app-container {
             display: grid;
             grid-template-rows: auto 1fr;
-            height: 100vh;
-            gap: 20px;
-            padding: 20px;
+            height: 95vh;
+            gap: 10px;
+            padding: 10px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
         .main-toolbar {
@@ -42,9 +44,10 @@
 
         .workspace {
             display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 20px;
+            grid-template-columns: minmax(0, 1fr) 280px;
+            gap: 10px;
             height: 100%;
+            overflow: hidden;
         }
 
         .canvas-container {
@@ -52,25 +55,23 @@
             flex-direction: column;
             gap: 10px;
             background-color: var(--secondary-bg);
-            padding: 20px;
+            padding: 10px;
             border-radius: 5px;
             position: relative;
+            overflow: auto;
         }
 
         .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            background-color: var(--secondary-bg);
-            padding: 20px;
-            border-radius: 5px;
+            max-height: 80vh;
             overflow-y: auto;
+            padding: 10px;
         }
 
         .tool-section {
             background-color: var(--tertiary-bg);
-            padding: 15px;
+            padding: 10px;
             border-radius: 5px;
+            margin-bottom: 10px;
         }
 
         .tool-section h3 {
@@ -82,6 +83,10 @@
 
         canvas {
             max-width: 100%;
+            max-height: 75vh;
+            object-fit: contain;
+            width: auto;
+            height: auto;
             background-color: #333;
             border: 1px solid var(--border-color);
         }
@@ -143,10 +148,15 @@
         @media (max-width: 1024px) {
             .workspace {
                 grid-template-columns: 1fr;
+                grid-template-rows: auto auto;
             }
             
             .sidebar {
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                max-height: none;
+            }
+
+            canvas {
+                max-height: 50vh;
             }
         }
     </style>
@@ -350,6 +360,8 @@
         function initDrawingLayer() {
             drawingLayer.width = canvas.width;
             drawingLayer.height = canvas.height;
+            drawingCtx = drawingLayer.getContext('2d', { willReadFrequently: true });
+            drawingCtx.imageSmoothingEnabled = true;
             drawingStates = [];
             saveDrawingState();
         }
@@ -359,21 +371,31 @@
             if (drawingStates.length > 50) drawingStates.shift();
         }
 
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            const displayWidth = rect.width;
+            const displayHeight = rect.height;
+            
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            return {
+                x: (x / displayWidth) * canvas.width,
+                y: (y / displayHeight) * canvas.height
+            };
+        }
+
         function startDrawing(e) {
             isDrawing = true;
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const coords = getCanvasCoordinates(e);
             drawingCtx.beginPath();
-            drawingCtx.moveTo(x, y);
+            drawingCtx.moveTo(coords.x, coords.y);
         }
         
         function draw(e) {
             if (!isDrawing) return;
             
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const coords = getCanvasCoordinates(e);
             
             drawingCtx.lineCap = 'round';
             drawingCtx.lineJoin = 'round';
@@ -381,10 +403,10 @@
                 drawingCtx.strokeStyle = brushColor.value;
             }
             
-            drawingCtx.lineTo(x, y);
+            drawingCtx.lineTo(coords.x, coords.y);
             drawingCtx.stroke();
             drawingCtx.beginPath();
-            drawingCtx.moveTo(x, y);
+            drawingCtx.moveTo(coords.x, coords.y);
             
             redrawCanvas();
         }
@@ -518,8 +540,16 @@
                 img.onload = () => {
                     canvas.width = img.width;
                     canvas.height = img.height;
+                    
+                    drawingLayer.width = canvas.width;
+                    drawingLayer.height = canvas.height;
+                    
+                    drawingCtx = drawingLayer.getContext('2d', { willReadFrequently: true });
+                    drawingCtx.imageSmoothingEnabled = true;
+                    
                     initDrawingLayer();
                     redrawCanvas();
+                    setTool(currentTool); 
                 };
                 img.src = event.target.result;
             };
@@ -656,27 +686,36 @@
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
+            startDrawing({
                 clientX: touch.clientX,
                 clientY: touch.clientY
             });
-            startDragging(mouseEvent);
         });
         
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
+            draw({
                 clientX: touch.clientX,
                 clientY: touch.clientY
             });
-            drag(mouseEvent);
         });
         
         canvas.addEventListener('touchend', stopDragging);
         canvas.addEventListener('touchcancel', stopDragging);
         
         initDrawingLayer();
+
+        const style = document.createElement('style');
+        style.textContent = `
+            canvas {
+                image-rendering: -moz-crisp-edges;
+                image-rendering: -webkit-crisp-edges;
+                image-rendering: pixelated;
+                image-rendering: crisp-edges;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
