@@ -3,185 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>edging corp</title>
+    <title>Image Editor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
+        :root {
+            --primary-bg: #1a1a1a;
+            --secondary-bg: #2d2d2d;
+            --tertiary-bg: #3d3d3d;
+            --border-color: #444;
+            --text-color: #ffffff;
+            --accent-color: #4CAF50;
+            --accent-hover: #45a049;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #1a1a1a;
-            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
         }
-        
-        .container {
-            display: flex;
-            width: 100%;
+
+        .app-container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
             gap: 20px;
+            padding: 20px;
         }
-        
-        .editor {
-            flex: 1;
+
+        .main-toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background-color: var(--secondary-bg);
+            border-radius: 5px;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .canvas-container {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            gap: 10px;
+            background-color: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 5px;
             position: relative;
         }
-        
-        .controls {
-            width: 300px;
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background-color: var(--secondary-bg);
             padding: 20px;
-            background-color: #2d2d2d;
-            border-radius: 10px;
-            color: #ffffff;
+            border-radius: 5px;
+            overflow-y: auto;
         }
-        
+
+        .tool-section {
+            background-color: var(--tertiary-bg);
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .tool-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
         canvas {
-            border: 1px solid #444;
             max-width: 100%;
-            margin-bottom: 20px;
             background-color: #333;
+            border: 1px solid var(--border-color);
         }
-        
+
         input, select, button {
             width: 100%;
+            padding: 8px;
             margin: 5px 0;
-            padding: 5px;
-            background-color: #3d3d3d;
-            color: #ffffff;
-            border: 1px solid #555;
+            background-color: var(--tertiary-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
         }
-        
-        select option {
-            background-color: #3d3d3d;
-            color: #ffffff;
+
+        .slider-group {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
         }
-        
-        input[type="file"] {
-            background-color: transparent;
-            border: none;
-            color: #ffffff;
+
+        .tool-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 5px;
         }
-        
-        input[type="range"] {
-            background-color: #3d3d3d;
+
+        .tool-btn {
+            background-color: var(--tertiary-bg);
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
         }
-        
-        input[type="color"] {
-            background-color: #3d3d3d;
-            border: 1px solid #555;
+
+        .tool-btn.active {
+            background-color: var(--accent-color);
         }
-        
-        button {
-            background-color: #4CAF50;
+
+        button.primary {
+            background-color: var(--accent-color);
             color: white;
             border: none;
             padding: 10px;
             cursor: pointer;
-            transition: background-color 0.3s;
         }
-        
-        button:hover {
-            background-color: #45a049;
+
+        button.primary:hover {
+            background-color: var(--accent-hover);
         }
-        h2 {
-            margin-top: 0;
+
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        .control-group {
-            margin-bottom: 15px;
-        }
-        .slider-container {
-            display: flex;
-            align-items: center;
-        }
-        .slider-container input[type="range"] {
-            flex-grow: 1;
-            margin-right: 10px;
-        }
-        .slider-container span {
-            min-width: 30px;
-        }
-        .draggable-text {
-            position: absolute;
-            cursor: move;
-            user-select: none;
+
+        @media (max-width: 1024px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
         }
     </style>
 </head>
 <body>
-    <h1>Image editor</h1>
-    <div class="container">
-        <div class="editor">
+    <div class="app-container">
+        <div class="main-toolbar">
             <input type="file" id="imageInput" accept="image/*">
-            <canvas id="canvas"></canvas>
-            <button id="exportBtn">Export Image</button>
+            <button class="primary" id="exportBtn">Export Image</button>
         </div>
-        <div class="controls">
-            <h2>Text Controls</h2>
-            <div class="control-group">
-                <input type="text" id="textInput" placeholder="Enter text">
+
+        <div class="workspace">
+            <div class="canvas-container">
+                <canvas id="canvas"></canvas>
             </div>
-            <div class="control-group slider-container">
-                <input type="range" id="xSlider" min="0" max="100" value="50">
-                <span id="xValue">X: 50%</span>
-            </div>
-            <div class="control-group slider-container">
-                <input type="range" id="ySlider" min="0" max="100" value="50">
-                <span id="yValue">Y: 50%</span>
-            </div>
-            <div class="control-group slider-container">
-                <input type="range" id="sizeSlider" min="10" max="100" value="30">
-                <span id="sizeValue">Size: 30px</span>
-            </div>
-            
-            <div class="tools">
-                <div class="tool-buttons">
-                    <button id="penTool" class="tool-btn active">Pen</button>
-                    <button id="pencilTool" class="tool-btn">Pencil</button>
-                    <button id="highlighterTool" class="tool-btn">Highlighter</button>
-                    <button id="eraserTool" class="tool-btn">Eraser</button>
-                    <button id="undoDrawing" class="tool-btn">Undo Drawing</button>
-                </div>
-                <div class="control-group slider-container">
-                    <input type="range" id="brushSize" min="1" max="50" value="5">
-                    <span id="brushValue">Size: 5px</span>
-                </div>
-                <div class="control-group">
+
+            <div class="sidebar">
+                <div class="tool-section" id="drawingTools">
+                    <h3>Drawing Tools</h3>
+                    <div class="tool-buttons">
+                        <button id="penTool" class="tool-btn active">Pen</button>
+                        <button id="pencilTool" class="tool-btn">Pencil</button>
+                        <button id="highlighterTool" class="tool-btn">Highlight</button>
+                        <button id="eraserTool" class="tool-btn">Eraser</button>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" id="brushSize" min="1" max="50" value="5">
+                        <span id="brushValue">5px</span>
+                    </div>
                     <input type="color" id="brushColor" value="#000000">
+                    <button id="undoDrawing">Undo Drawing</button>
+                </div>
+
+                <div class="tool-section" id="textTools">
+                    <h3>Text Tools</h3>
+                    <input type="text" id="textInput" placeholder="Enter text">
+                    <div class="slider-group">
+                        <input type="range" id="xSlider" min="0" max="100" value="50">
+                        <span id="xValue">50%</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" id="ySlider" min="0" max="100" value="50">
+                        <span id="yValue">50%</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" id="sizeSlider" min="10" max="100" value="30">
+                        <span id="sizeValue">30px</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" id="rotationSlider" min="0" max="360" value="0">
+                        <span id="rotationValue">0°</span>
+                    </div>
+                    <select id="fontSelect">
+                        <option value="Arial">Arial</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Courier">Courier</option>
+                        <option value="serif">Serif</option>
+                        <option value="sans-serif">Sans-serif</option>
+                    </select>
+                    <div class="color-picker-group">
+                        <input type="color" id="colorPicker" value="#000000">
+                        <select id="alignSelect">
+                            <option value="left">Left</option>
+                            <option value="center">Center</option>
+                            <option value="right">Right</option>
+                        </select>
+                    </div>
+                    <button class="primary" id="addTextBtn">Add Text</button>
+                    <button id="undoBtn">Undo Last Text</button>
+                    <button id="clearBtn">Clear All</button>
                 </div>
             </div>
-
-            <div class="control-group">
-                <select id="fontSelect">
-                    <option value="Arial">Arial</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier">Courier</option>
-                    <option value="serif">Serif</option>
-                    <option value="sans-serif">Sans-serif</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <input type="color" id="colorPicker" value="#000000">
-                <select id="alignSelect">
-                    <option value="left">Left</option>
-                    <option value="center">Center</option>
-                    <option value="right">Right</option>
-                </select>
-            </div>
-            
-            <div class="control-group slider-container">
-                <input type="range" id="rotationSlider" min="0" max="360" value="0">
-                <span id="rotationValue">Rotation: 0°</span>
-            </div>
-            <button id="addTextBtn">Add Text</button>
-            <button id="undoBtn">Undo Last Text</button>
-            <button id="clearBtn">Clear All Text</button>
         </div>
     </div>
 
